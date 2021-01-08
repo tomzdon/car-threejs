@@ -1,44 +1,446 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>Car Driving</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="http://localhost:8081/css" />
-  </head>
-  <body>
-    <script type="text/javascript" src="http://localhost:8081/js"></script>
-    <script>
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Car Driving</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="http://localhost:8081/css" />
+</head>
+
+<body>
+  <div id="info" style="display: none;">
+    <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> car materials<br />
+    Ferrari 458 Italia model by <a href="https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6" target="_blank"
+      rel="noopener">vicent091036</a>
+    <br><br>
+    <span class="colorPicker"><input id="body-color" type="color" value="#ff0000"></input><br />Body</span>
+    <span class="colorPicker"><input id="details-color" type="color" value="#ffffff"></input><br />Details</span>
+    <span class="colorPicker"><input id="glass-color" type="color" value="#ffffff"></input><br />Glass</span>
+  </div>
+
+  <script type="module">
+
+    import * as THREE from 'https://unpkg.com/three/build/three.module.js';
+
+    import Stats from 'https://unpkg.com/three/examples/jsm/libs/stats.module.js';
+
+    import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
+    import { MD2CharacterComplex } from 'https://unpkg.com/three/examples/jsm/misc/MD2CharacterComplex.js';
+    import { Gyroscope } from 'https://unpkg.com/three/examples/jsm/misc/Gyroscope.js';
+    import { RoomEnvironment } from 'https://unpkg.com/three/examples/jsm/environments/RoomEnvironment.js';
+
+    import { GLTFLoader } from 'https://unpkg.com/three/examples/jsm/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'https://unpkg.com/three/examples/jsm/loaders/DRACOLoader.js';
+
+    let SCREEN_WIDTH = window.innerWidth;
+    let SCREEN_HEIGHT = window.innerHeight;
+
+    let container, stats;
+    let camera, scene, renderer;
+
+    const characters = [];
+    let nCharacters = 0;
+
+    let cameraControls;
+    let grid;
+    const wheels = [];
+
+    const controls = {
+
+      moveForward: false,
+      moveBackward: false,
+      moveLeft: false,
+      moveRight: false
+
+    };
+
+    const clock = new THREE.Clock();
+    let carModel;
+    let mesh;
+
+    init();
+    animate();
+
+    function init() {
+
+      container = document.createElement('div');
+      document.body.appendChild(container);
+
+      // CAMERA
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 4000);
+      camera.position.set(-0.3, 2.1, 381.01);
+      var camerapos = new THREE.Vector3(0,
+        1.333, 0);
+
+
+      // SCENE
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xffffff);
+      scene.fog = new THREE.Fog(0xffffff, 1000, 4000);
+
+      // scene.add(camera);
+
+      // LIGHTS
+
+      scene.add(new THREE.AmbientLight(0x222222));
+
+      const light = new THREE.DirectionalLight(0xffffff, 2.25);
+      light.position.set(200, 450, 500);
+
+      light.castShadow = true;
+
+      light.shadow.mapSize.width = 1024;
+      light.shadow.mapSize.height = 512;
+
+      light.shadow.camera.near = 100;
+      light.shadow.camera.far = 1200;
+
+      light.shadow.camera.left = - 1000;
+      light.shadow.camera.right = 1000;
+      light.shadow.camera.top = 350;
+      light.shadow.camera.bottom = - 350;
+
+      scene.add(light);
+      // scene.add( new THREE.CameraHelper( light.shadow.camera ) );
+
+
+      //  GROUND
+
+      const gt = new THREE.TextureLoader().load("http://localhost:8081/terrain");
+      const gg = new THREE.PlaneBufferGeometry(16000, 16000);
+      const gm = new THREE.MeshPhongMaterial({ color: 0xffffff, map: gt });
+
+      const ground = new THREE.Mesh(gg, gm);
+      ground.rotation.x = - Math.PI / 2;
+      ground.material.map.repeat.set(64, 64);
+      ground.material.map.wrapS = THREE.RepeatWrapping;
+      ground.material.map.wrapT = THREE.RepeatWrapping;
+      ground.material.map.encoding = THREE.sRGBEncoding;
+      // note that because the ground does not cast a shadow, .castShadow is left false
+      ground.receiveShadow = true;
+
+      const gt1 = new THREE.TextureLoader().load("http://localhost:8081/terrain");
+      const gg1 = new THREE.PlaneBufferGeometry(160, 160);
+      const gm1 = new THREE.MeshPhongMaterial({ color: 0xffffff, map: gt1 });
+
+      var texture = THREE.ImageUtils.loadTexture('http://localhost:8081/road');
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 40);
+
+      var road = new THREE.Mesh(new THREE.PlaneGeometry(8,
+        400 * 2),
+        new THREE.MeshBasicMaterial(
+          { color: 0xaaaaaa, shininess: 100, ambient: 0x333333, map: texture }
+        )
       );
+      road.rotation.x = -Math.PI / 2;
+      road.position.y = 1;
 
-      const renderer = new THREE.WebGLRenderer();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
 
-      const geometry = new THREE.BoxGeometry();
-      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-      const cube = new THREE.Mesh(geometry, material);
-      scene.add(cube);
 
-      camera.position.z = 5;
 
-      const animate = function () {
-        // requestAnimationFrame(animate);
+      scene.add(ground);
+      scene.add(road);
 
-        // cube.rotation.x += 0.01;
-        // cube.rotation.y += 0.01;
+      // c
 
-        renderer.render(scene, camera);
+      // RENDERER
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+      container.appendChild(renderer.domElement);
+
+      //
+
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      // STATS
+
+
+      // EVENTS
+
+      window.addEventListener('resize', onWindowResize, false);
+      document.addEventListener('keydown', onKeyDown, false);
+      document.addEventListener('keyup', onKeyUp, false);
+
+      // CONTROLS
+
+      cameraControls = new OrbitControls(camera, renderer.domElement);
+      cameraControls.target.set(0, 50, 0);
+      cameraControls.enableKeys = false;
+      cameraControls.update();
+
+      //Material
+      const bodyMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xff0000, metalness: 0.6, roughness: 0.4, clearcoat: 0.05, clearcoatRoughness: 0.05
+      });
+
+      const detailsMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffffff, metalness: 1.0, roughness: 0.5
+      });
+
+      const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff, metalness: 0, roughness: 0.1, transmission: 0.9, transparent: true
+      });
+
+      const bodyColorInput = document.getElementById('body-color');
+      bodyColorInput.addEventListener('input', function () {
+
+        bodyMaterial.color.set(this.value);
+
+      });
+
+      const detailsColorInput = document.getElementById('details-color');
+      detailsColorInput.addEventListener('input', function () {
+
+        detailsMaterial.color.set(this.value);
+
+      });
+
+      const glassColorInput = document.getElementById('glass-color');
+      glassColorInput.addEventListener('input', function () {
+
+        glassMaterial.color.set(this.value);
+
+      });
+
+      grid = new THREE.GridHelper(100, 40, 0x000000, 0x000000);
+      grid.material.opacity = 0.1;
+      grid.material.depthWrite = false;
+      grid.material.transparent = true;
+      scene.add(grid);
+      // Car
+
+      const shadow = new THREE.TextureLoader().load('/static/ferrari_ao.png');
+
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath('/static/gltf/');
+
+      const loader = new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
+
+      loader.load('/static/ferrari.glb', function (gltf) {
+
+        carModel = gltf.scene.children[0];
+
+        carModel.getObjectByName('body').material = bodyMaterial;
+
+        carModel.getObjectByName('rim_fl').material = detailsMaterial;
+        carModel.getObjectByName('rim_fr').material = detailsMaterial;
+        carModel.getObjectByName('rim_rr').material = detailsMaterial;
+        carModel.getObjectByName('rim_rl').material = detailsMaterial;
+        carModel.getObjectByName('trim').material = detailsMaterial;
+
+        carModel.getObjectByName('glass').material = glassMaterial;
+
+        wheels.push(
+          carModel.getObjectByName('wheel_fl'),
+          carModel.getObjectByName('wheel_fr'),
+          carModel.getObjectByName('wheel_rl'),
+          carModel.getObjectByName('wheel_rr')
+        );
+
+        // shadow
+        mesh = new THREE.Mesh(
+          new THREE.PlaneBufferGeometry(0.655 * 4, 1.3 * 4),
+          new THREE.MeshBasicMaterial({
+            map: shadow, blending: THREE.MultiplyBlending, toneMapped: false, transparent: true
+          })
+        );
+        mesh.rotation.x = - Math.PI / 2;
+        mesh.renderOrder = 2;
+        carModel.add(mesh);
+
+        carModel.position.y = 1;
+        carModel.position.z = 380;
+        scene.add(carModel);
+        scene.add(camera)
+
+
+      });
+
+      // CHARACTER
+
+      const configOgro = {
+
+        baseUrl: "models/md2/ogro/",
+
+        body: "ogro.md2",
+        skins: ["grok.jpg"],
+        weapons: [["weapon.md2", "weapon.jpg"]],
+        animations: {
+          move: "run",
+          idle: "stand",
+          jump: "jump",
+          attack: "attack",
+          crouchMove: "cwalk",
+          crouchIdle: "cstand",
+          crouchAttach: "crattack"
+        },
+
+        walkSpeed: 350,
+        crouchSpeed: 175
+
       };
 
-      animate();
-    </script>
-  </body>
+      const nRows = 1;
+      const nSkins = configOgro.skins.length;
+
+      nCharacters = nSkins * nRows;
+
+      for (let i = 0; i < nCharacters; i++) {
+
+        const character = new MD2CharacterComplex();
+        character.scale = 3;
+        character.controls = controls;
+        characters.push(character);
+
+      }
+
+      const baseCharacter = new MD2CharacterComplex();
+      baseCharacter.scale = 3;
+
+      baseCharacter.onLoadComplete = function () {
+
+        let k = 0;
+
+        for (let j = 0; j < nRows; j++) {
+
+          for (let i = 0; i < nSkins; i++) {
+
+            const cloneCharacter = characters[k];
+
+            cloneCharacter.shareParts(baseCharacter);
+
+            // cast and receive shadows
+            cloneCharacter.enableShadows(true);
+
+            cloneCharacter.setWeapon(0);
+            cloneCharacter.setSkin(i);
+
+            cloneCharacter.root.position.x = (i - nSkins / 2) * 150;
+            cloneCharacter.root.position.z = j * 250;
+
+            scene.add(cloneCharacter.root);
+
+            k++;
+
+          }
+
+        }
+
+        const gyro = new Gyroscope();
+        gyro.add(camera);
+        gyro.add(light, light.target);
+
+        characters[Math.floor(nSkins / 2)].root.add(gyro);
+
+      };
+
+      baseCharacter.loadParts(configOgro);
+
+    }
+
+    // EVENT HANDLERS
+
+    function onWindowResize() {
+
+      SCREEN_WIDTH = window.innerWidth;
+      SCREEN_HEIGHT = window.innerHeight;
+
+      renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+      camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+      camera.updateProjectionMatrix();
+
+    }
+
+    function onKeyDown(event) {
+
+      switch (event.keyCode) {
+
+        case 38: /*up*/
+        case 87: /*W*/ 	controls.moveForward = true; break;
+
+        case 40: /*down*/
+        case 83: /*S*/ 	 controls.moveBackward = true; break;
+
+        case 37: /*left*/
+        case 65: /*A*/ controls.moveLeft = true; break;
+
+        case 39: /*right*/
+        case 68: /*D*/ controls.moveRight = true; break;
+
+        //case 67: /*C*/     controls.crouch = true; break;
+        //case 32: /*space*/ controls.jump = true; break;
+        //case 17: /*ctrl*/  controls.attack = true; break;
+
+      }
+
+    }
+
+    function onKeyUp(event) {
+
+      switch (event.keyCode) {
+
+        case 38: /*up*/
+        case 87: /*W*/ controls.moveForward = false; break;
+
+        case 40: /*down*/
+        case 83: /*S*/ 	 controls.moveBackward = false; break;
+
+        case 37: /*left*/
+        case 65: /*A*/ 	 controls.moveLeft = false; break;
+
+        case 39: /*right*/
+        case 68: /*D*/ controls.moveRight = false; break;
+
+      }
+
+    }
+
+    //
+
+    function animate() {
+
+      requestAnimationFrame(animate);
+      render();
+
+
+    }
+
+    function render() {
+
+      const delta = clock.getDelta();
+
+      for (let i = 0; i < nCharacters; i++) {
+
+        characters[i].update(delta);
+
+      }
+      const time = - performance.now() / 1000;
+
+      for (let i = 0; i < wheels.length; i++) {
+
+        wheels[i].rotation.x = time * Math.PI;
+
+      }
+      camera.lookAt(carModel.position)
+      carModel.position.z += (time) % 2;
+      // grid.position.z += (time) % 5;
+
+      renderer.render(scene, camera);
+
+    }
+
+  </script>
+
+</body>
+
 </html>
