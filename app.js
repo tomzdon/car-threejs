@@ -20,6 +20,7 @@ app.get("/road", (req, res) => {
   res.sendFile(path.join(__dirname + "/images/road.jpg"));
 });
 app.use("/static", express.static("models"));
+app.use("/images", express.static("images"));
 var httpServer = http.createServer(app);
 
 httpServer.listen(8081);
